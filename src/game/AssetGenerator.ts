@@ -287,8 +287,8 @@ function generateTiles(scene: Phaser.Scene) {
 3333333333333333
 3333333333333333`));
 
-  // Crate - wooden crate with cross pattern
-  tileTex(scene, 'tile_crate', p(`
+  // boulder
+  tileTex(scene, 'tile_boulder', p(`
 0000011111100000
 0001133333311000
 0013333333333100
@@ -305,6 +305,25 @@ function generateTiles(scene: Phaser.Scene) {
 1121212121212121
 0112121112121110
 0001111111111000`));
+
+  // Crate 
+  tileTex(scene, 'tile_crate', p(`
+    1222222222222221
+    1211111111111121
+    1211331111331121
+    1213113113113121
+    1213113113113121
+    1211331111331121
+    1211111111111121
+    1222222222222221
+    1111111111111111
+    1222222222222221
+    1222222222222221
+    1222222222222221
+    1222222222222221
+    1222222222222221
+    1212122222212121
+    1111111111111111`));
 
   // Elevator doors
   tileTex(scene, 'tile_elevator', p(`
@@ -1449,13 +1468,16 @@ function generateUI(scene: Phaser.Scene) {
 
   // Arrow indicator for menus/interaction
   tex(scene, 'arrow_indicator', 8, 8, (g) => {
-    g.fillStyle(C.DARKEST, 1);
-    g.fillRect(1, 0, 2, 2);
-    g.fillRect(3, 2, 2, 2);
-    g.fillRect(5, 4, 2, 2);
-    g.fillRect(3, 6, 2, 2);
-    g.fillRect(1, 4, 2, 2);
-    g.fillRect(0, 2, 2, 4);
+    const px = p(`
+      00133100
+      00133100
+      00133100
+      11133111
+      13333331
+      01333310
+      00133100
+      00011000`);
+    drawPixels(g, px, 0, 0, PAL);
   });
 
   // Chapter card background
