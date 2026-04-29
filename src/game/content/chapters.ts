@@ -1,0 +1,57 @@
+import type { ChapterData } from '../types';
+
+export const chapters: Record<string, ChapterData> = {
+  uw_campus: {
+    id: 'uw_campus',
+    title: 'University of Wisconsin',
+    subtitle: 'College of Engineering',
+    year: '2012–2016',
+    summary: 'B.S. in Industrial & Systems Engineering. Kevin learns to think in systems: processes, constraints, flows, and improvements.',
+    badge: 'Systems Badge',
+    maps: ['uw_campus_exterior', 'uw_engineering'],
+  },
+  interview_trail: {
+    id: 'interview_trail',
+    title: 'Interview Trail',
+    subtitle: 'Madison to Chicago',
+    year: '2016',
+    summary: 'Kevin graduates, navigates interviews, and moves to Chicago for consulting.',
+    badge: 'Offer Letter',
+    maps: ['interview_trail'],
+  },
+  baker_tilly: {
+    id: 'baker_tilly',
+    title: 'Baker Tilly',
+    subtitle: 'Factory Floor',
+    year: '2016–2017',
+    summary: 'ERP & Manufacturing Execution implementations for automotive suppliers. Business requirements across EDI, MRP, shop floor production, purchasing, and cost accounting.',
+    badge: 'Manufacturing Badge',
+    maps: ['baker_tilly_factory'],
+  },
+  deloitte_tower: {
+    id: 'deloitte_tower',
+    title: 'Deloitte Digital',
+    subtitle: 'The Tower of Trials',
+    year: '2017–2021',
+    summary: 'Product ownership, agile delivery, React/Python/PHP fluency, ERP/CRM implementation breadth, revenue recognition expertise, and pre-IPO operational scale work.',
+    badge: 'Consulting Badge',
+    maps: ['deloitte_lobby', 'deloitte_meta', 'deloitte_cloudflare', 'deloitte_warehousing', 'deloitte_revenue'],
+  },
+  reddit_hq: {
+    id: 'reddit_hq',
+    title: 'Reddit',
+    subtitle: 'Finance Applications',
+    year: '2021–Present',
+    summary: 'Finance Applications Manager. Order management, 20+ integrations, subledger automation, data pipelines, SOX compliance. Reduced month-end close from 12 days to 3.',
+    badge: 'Scale Badge',
+    maps: ['reddit_campus', 'reddit_casino'],
+  },
+  hall_of_fame: {
+    id: 'hall_of_fame',
+    title: 'Hall of Fame',
+    subtitle: 'The Journey So Far',
+    year: '',
+    summary: 'Skills, certifications, interests, and contact links.',
+    maps: ['hall_of_fame'],
+  },
+};

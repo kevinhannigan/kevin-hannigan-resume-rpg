@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GBC Pixel Sprite Editor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    body { background: #0f1117; }
+    .grid-cell {
+      transition: background-color 80ms;
+      cursor: crosshair;
+    }
+    .grid-cell:hover { outline: 2px solid #fff6; }
+    .grid-cell.transparent-cell {
+      background-image:
+        linear-gradient(45deg, #2a2a3e 25%, transparent 25%),
+        linear-gradient(-45deg, #2a2a3e 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #2a2a3e 75%),
+        linear-gradient(-45deg, transparent 75%, #2a2a3e 75%) !important;
+      background-size: 50% 50%;
+      background-position: 0 0, 0 50%, 50% -50%, -50% 0;
+      background-color: #1a1a2e !important;
+    }
+    .preview-pixel { image-rendering: pixelated; }
+    .color-swatch {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: transform 120ms, box-shadow 120ms;
+    }
+    .color-swatch:hover { transform: scale(1.1); }
+    .color-swatch.active { transform: scale(1.15); box-shadow: 0 0 0 3px #fff, 0 0 12px 2px #fff8; }
+    textarea, pre { font-family: 'Courier New', monospace; }
+    .checkerboard {
+      background-image:
+        linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
+        linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
+        linear-gradient(-45deg, transparent 75%, #1a1a2e 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-color: #12121f;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-gray-200" x-data="editor()" x-cloak>
+
+  <!-- Header -->
+  <header class="border-b border-gray-800 px-6 py-4">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-white">GBC Pixel Sprite Editor</h1>
+        <p class="text-xs text-gray-500 mt-0.5">Draw &bull; Import &bull; Export &mdash; digit-array format for AssetGenerator.ts</p>
+      </div>
+      <div class="flex gap-2">
+        <button @click="undo()" :disabled="!historyUndo.length" class="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed">Undo</button>
+        <button @click="redo()" :disabled="!historyRedo.length" class="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed">Redo</button>
+        <span class="w-px h-5 bg-gray-700 self-center"></span>
+        <button @click="flipH()" class="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700" title="Flip Horizontal">Flip H</button>
+        <button @click="flipV()" class="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-gray-700" title="Flip Vertical">Flip V</button>
+        <span class="w-px h-5 bg-gray-700 self-center"></span>
+        <button @click="clearGrid()" class="px-3 py-1.5 text-xs rounded bg-gray-800 hover:bg-red-900/60">Clear</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-6 flex flex-col lg:flex-row gap-6">
+
+    <!-- Left: Grid + Preview -->
+    <div class="flex-1 space-y-5">
+
+      <!-- Grid Size -->
+      <div class="flex items-center gap-4">
+        <label class="text-xs text-gray-400">Grid:</label>
+        <select x-model.number="gridW" @change="resizeGrid()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700">
+          <template x-for="s in [8,16,24,32]"><option :value="s" x-text="s"></option></template>
+        </select>
+        <span class="text-gray-600">&times;</span>
+        <select x-model.number="gridH" @change="resizeGrid()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700">
+          <template x-for="s in [8,16,24,32]"><option :value="s" x-text="s"></option></template>
+        </select>
+        <label class="text-xs text-gray-400 ml-4">Zoom:</label>
+        <input type="range" min="16" max="40" x-model.number="cellSize" class="w-24 accent-emerald-500">
+        <span class="text-xs text-gray-500" x-text="cellSize + 'px'"></span>
+      </div>
+
+      <!-- Drawing Grid -->
+      <div class="inline-block border border-gray-700 rounded-lg overflow-hidden bg-gray-900 p-1 relative">
+        <!-- Trace overlay image behind the grid -->
+        <img x-show="traceUrl && traceVisible"
+             :src="traceUrl"
+             :style="`width:${cellSize * gridW}px;height:${cellSize * gridH}px;opacity:${traceOpacity / 100}`"
+             class="absolute top-1 left-1 pointer-events-none z-0"
+             style="image-rendering: pixelated;">
+        <div class="relative z-10"
+             @mousedown="painting = true; paintStroke = []; saveSnapshot()"
+             @mouseup="painting = false"
+             @mouseleave="painting = false">
+          <template x-for="(row, y) in grid" :key="y">
+            <div class="flex">
+              <template x-for="(cell, x) in row" :key="x">
+                <div class="grid-cell"
+                     :class="{ 'transparent-cell': cell === 0 && !(traceUrl && traceVisible) }"
+                     :style="`width:${cellSize}px;height:${cellSize}px;${cell !== 0 ? 'background:' + getColor(cell) : ''}`"
+                     @mousedown="paint(x, y)"
+                     @mouseenter="if(painting) paint(x, y)">
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div>
+        <h3 class="text-xs text-gray-400 mb-2">Preview (1x &bull; 2x &bull; 4x)</h3>
+        <div class="flex items-end gap-4">
+          <template x-for="scale in [1, 2, 4]" :key="scale">
+            <div class="checkerboard rounded" :style="`width:${gridW*scale}px;height:${gridH*scale}px`">
+              <canvas :id="'preview'+scale"
+                      :width="gridW" :height="gridH"
+                      :style="`width:${gridW*scale}px;height:${gridH*scale}px;image-rendering:pixelated`"
+                      class="block"></canvas>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Palette + Import/Export -->
+    <div class="w-full lg:w-80 space-y-5">
+
+      <!-- Palette -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-300">Palette</h3>
+        <div class="flex gap-3 items-center flex-wrap">
+          <!-- Transparent (0) -->
+          <div class="text-center">
+            <div class="color-swatch border-2 border-dashed border-red-400/60 checkerboard relative"
+                 :class="{ active: activePalette === 0 }"
+                 @click="activePalette = 0">
+              <span class="absolute inset-0 flex items-center justify-center text-red-400/80 text-lg font-bold select-none">&times;</span>
+            </div>
+            <span class="text-[10px] text-red-400/70 block mt-1">0 (clear)</span>
+          </div>
+          <!-- Colors 1-4 -->
+          <template x-for="i in [1,2,3,4]" :key="i">
+            <div class="text-center">
+              <div class="color-swatch relative overflow-hidden"
+                   :class="[activePalette === i ? 'active' : '', i === 1 ? 'border-2 border-gray-400' : 'border-2 border-gray-600']"
+                   :style="`background:${palette[i]}`"
+                   @click="activePalette = i">
+                <span x-show="i === 1" class="absolute bottom-0.5 right-1 text-gray-400 text-[8px] font-bold select-none">1</span>
+              </div>
+              <span class="text-[10px] text-gray-500 block mt-1" x-text="'#' + i"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Color pickers -->
+        <div class="space-y-2 pt-2 border-t border-gray-800">
+          <template x-for="i in [1,2,3,4]" :key="'pick'+i">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-gray-500 w-5" x-text="'#'+i"></span>
+              <input type="color" :value="palette[i]" @input="palette[i] = $event.target.value; renderPreview()" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0">
+              <input type="text" :value="palette[i]" @change="palette[i] = $event.target.value; renderPreview()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700 w-24 font-mono">
+              <button @click="palette[i] = defaultPalette[i]; renderPreview()" class="text-[10px] text-gray-600 hover:text-gray-300" title="Reset to default">reset</button>
+            </div>
+          </template>
+        </div>
+        <button @click="resetPalette()" class="text-xs text-gray-500 hover:text-white">Reset all to GBC defaults</button>
+      </div>
+
+      <!-- Tool -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-300">Tool</h3>
+        <div class="flex gap-2">
+          <button @click="tool = 'paint'" :class="tool === 'paint' ? 'bg-emerald-700 text-white' : 'bg-gray-800 text-gray-400'" class="px-3 py-1.5 text-xs rounded">Paint</button>
+          <button @click="tool = 'fill'" :class="tool === 'fill' ? 'bg-emerald-700 text-white' : 'bg-gray-800 text-gray-400'" class="px-3 py-1.5 text-xs rounded">Fill</button>
+          <button @click="tool = 'eyedropper'" :class="tool === 'eyedropper' ? 'bg-emerald-700 text-white' : 'bg-gray-800 text-gray-400'" class="px-3 py-1.5 text-xs rounded">Pick</button>
+        </div>
+        <p class="text-[10px] text-gray-600">Tip: hold Shift to eyedrop, Alt to fill</p>
+      </div>
+
+      <!-- Trace Overlay -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-300">Trace Overlay</h3>
+        <p class="text-[10px] text-gray-500">Upload a reference image to trace over. It appears behind the grid at adjustable opacity.</p>
+        <input type="file" accept="image/*" @change="onTraceFile($event)" class="block w-full text-xs text-gray-400 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-gray-200 file:cursor-pointer hover:file:bg-gray-600">
+        <template x-if="traceUrl">
+          <div class="space-y-2 pt-1">
+            <div class="flex items-center gap-3">
+              <img :src="traceUrl" class="w-12 h-12 object-contain rounded border border-gray-700 bg-gray-950" style="image-rendering: pixelated;">
+              <div class="flex-1 space-y-2">
+                <div class="flex items-center gap-2">
+                  <label class="text-[10px] text-gray-400 w-14">Opacity:</label>
+                  <input type="range" min="5" max="90" x-model.number="traceOpacity" class="flex-1 accent-amber-500">
+                  <span class="text-[10px] text-gray-500 w-8 text-right" x-text="traceOpacity + '%'"></span>
+                </div>
+                <div class="flex gap-2">
+                  <button @click="traceVisible = !traceVisible"
+                          :class="traceVisible ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400'"
+                          class="flex-1 px-2 py-1 text-xs rounded"
+                          x-text="traceVisible ? 'Visible' : 'Hidden'"></button>
+                  <button @click="traceUrl = null; traceVisible = false" class="px-2 py-1 text-xs rounded bg-gray-800 hover:bg-red-900/60 text-gray-400">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Import Image -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-300">Import Image</h3>
+        <p class="text-[10px] text-gray-500">Upload any image to generate a silhouette starting point.</p>
+        <input type="file" accept="image/*" @change="onImageFile($event)" class="block w-full text-xs text-gray-400 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-gray-200 file:cursor-pointer hover:file:bg-gray-600">
+
+        <!-- Image preview -->
+        <template x-if="imagePreviewUrl">
+          <div class="flex items-start gap-3 pt-1">
+            <img :src="imagePreviewUrl" class="w-16 h-16 object-contain rounded border border-gray-700 bg-gray-950" style="image-rendering: pixelated;">
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center gap-2">
+                <label class="text-[10px] text-gray-400 w-16">Mode:</label>
+                <select x-model="imgMode" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700 flex-1">
+                  <option value="silhouette">Silhouette</option>
+                  <option value="color">Color (4-shade)</option>
+                </select>
+              </div>
+              <template x-if="imgMode === 'silhouette'">
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <label class="text-[10px] text-gray-400 w-16">Fill color:</label>
+                    <div class="flex gap-1">
+                      <template x-for="d in [1,2,3,4]" :key="'sil'+d">
+                        <button @click="imgFillDigit = d"
+                                :class="imgFillDigit === d ? 'ring-2 ring-white' : ''"
+                                :style="`background:${palette[d]}`"
+                                class="w-6 h-6 rounded border border-gray-600"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <label class="text-[10px] text-gray-400 w-16">Threshold:</label>
+                    <input type="range" min="10" max="245" x-model.number="imgThreshold" class="flex-1 accent-emerald-500">
+                    <span class="text-[10px] text-gray-500 w-6 text-right" x-text="imgThreshold"></span>
+                  </div>
+                </div>
+              </template>
+              <button @click="applyImage()" class="w-full px-3 py-1.5 text-xs rounded bg-indigo-700 hover:bg-indigo-600 text-white font-medium">Apply to Grid</button>
+            </div>
+          </div>
+        </template>
+        <canvas id="imgScratch" class="hidden"></canvas>
+      </div>
+
+      <!-- Import Text -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-300">Import Text</h3>
+        <textarea x-model="importText" rows="6" placeholder="Paste digit array here…&#10;e.g.&#10;0011111100&#10;0122222210&#10;…" class="w-full bg-gray-950 text-gray-300 text-[11px] p-3 rounded border border-gray-700 resize-y leading-relaxed"></textarea>
+        <button @click="doImport()" class="w-full px-3 py-2 text-xs rounded bg-gray-700 hover:bg-gray-600 font-medium">Import</button>
+      </div>
+
+      <!-- Export -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-gray-300">Export</h3>
+        <pre class="bg-gray-950 text-emerald-400 text-[11px] p-3 rounded max-h-64 overflow-auto whitespace-pre select-all leading-relaxed" x-text="exportText()"></pre>
+        <div class="flex gap-2">
+          <button @click="copyExport()" class="flex-1 px-3 py-2 text-xs rounded bg-emerald-700 hover:bg-emerald-600 text-white font-medium">
+            <span x-text="copied ? '✓ Copied!' : 'Copy to Clipboard'"></span>
+          </button>
+          <button @click="copyExportWrapped()" class="px-3 py-2 text-xs rounded bg-gray-800 hover:bg-gray-700" title="Copy wrapped in p(`...`)">
+            p(`…`)
+          </button>
+        </div>
+      </div>
+
+      <!-- Keyboard shortcuts -->
+      <div class="text-[10px] text-gray-600 space-y-0.5">
+        <p><kbd class="bg-gray-800 px-1 rounded">0-4</kbd> select palette</p>
+        <p><kbd class="bg-gray-800 px-1 rounded">B</kbd> paint &middot; <kbd class="bg-gray-800 px-1 rounded">G</kbd> fill &middot; <kbd class="bg-gray-800 px-1 rounded">I</kbd> eyedropper &middot; <kbd class="bg-gray-800 px-1 rounded">T</kbd> toggle trace</p>
+        <p><kbd class="bg-gray-800 px-1 rounded">Ctrl+Z</kbd> undo &middot; <kbd class="bg-gray-800 px-1 rounded">Ctrl+Shift+Z</kbd> redo</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function editor() {
+      const DEFAULT_PALETTE = {
+        1: '#081820',
+        2: '#346856',
+        3: '#88c070',
+        4: '#e0f8d0',
+      };
+
+      return {
+        gridW: 16,
+        gridH: 16,
+        cellSize: 28,
+        grid: [],
+        palette: { ...DEFAULT_PALETTE },
+        defaultPalette: { ...DEFAULT_PALETTE },
+        activePalette: 1,
+        tool: 'paint',
+        painting: false,
+        paintStroke: [],
+        historyUndo: [],
+        historyRedo: [],
+        importText: '',
+        copied: false,
+        imagePreviewUrl: null,
+        imageEl: null,
+        imgMode: 'silhouette',
+        imgFillDigit: 1,
+        imgThreshold: 128,
+        traceUrl: null,
+        traceOpacity: 50,
+        traceVisible: true,
+
+        init() {
+          this.grid = this.makeGrid(this.gridW, this.gridH);
+          this.$nextTick(() => this.renderPreview());
+          window.addEventListener('keydown', (e) => this.onKey(e));
+          this.$watch('grid', () => this.renderPreview());
+        },
+
+        makeGrid(w, h) {
+          return Array.from({ length: h }, () => Array(w).fill(0));
+        },
+
+        resizeGrid() {
+          const oldGrid = this.grid;
+          const newGrid = this.makeGrid(this.gridW, this.gridH);
+          for (let y = 0; y < Math.min(oldGrid.length, this.gridH); y++) {
+            for (let x = 0; x < Math.min(oldGrid[0].length, this.gridW); x++) {
+              newGrid[y][x] = oldGrid[y][x];
+            }
+          }
+          this.grid = newGrid;
+        },
+
+        getColor(val) {
+          if (val === 0) return 'transparent';
+          return this.palette[val] || '#ff00ff';
+        },
+
+        paint(x, y) {
+          if (this.tool === 'eyedropper') {
+            this.activePalette = this.grid[y][x];
+            return;
+          }
+          if (this.tool === 'fill') {
+            this.saveSnapshot();
+            this.floodFill(x, y, this.grid[y][x], this.activePalette);
+            this.grid = [...this.grid];
+            return;
+          }
+          this.grid[y][x] = this.activePalette;
+          this.grid = [...this.grid];
+        },
+
+        floodFill(x, y, target, replacement) {
+          if (target === replacement) return;
+          if (x < 0 || x >= this.gridW || y < 0 || y >= this.gridH) return;
+          if (this.grid[y][x] !== target) return;
+          this.grid[y][x] = replacement;
+          this.floodFill(x + 1, y, target, replacement);
+          this.floodFill(x - 1, y, target, replacement);
+          this.floodFill(x, y + 1, target, replacement);
+          this.floodFill(x, y - 1, target, replacement);
+        },
+
+        saveSnapshot() {
+          this.historyUndo.push(JSON.stringify(this.grid));
+          if (this.historyUndo.length > 50) this.historyUndo.shift();
+          this.historyRedo = [];
+        },
+
+        undo() {
+          if (!this.historyUndo.length) return;
+          this.historyRedo.push(JSON.stringify(this.grid));
+          this.grid = JSON.parse(this.historyUndo.pop());
+        },
+
+        redo() {
+          if (!this.historyRedo.length) return;
+          this.historyUndo.push(JSON.stringify(this.grid));
+          this.grid = JSON.parse(this.historyRedo.pop());
+        },
+
+        clearGrid() {
+          this.saveSnapshot();
+          this.grid = this.makeGrid(this.gridW, this.gridH);
+        },
+
+        flipH() {
+          this.saveSnapshot();
+          this.grid = this.grid.map(row => [...row].reverse());
+        },
+
+        flipV() {
+          this.saveSnapshot();
+          this.grid = [...this.grid].reverse();
+        },
+
+        resetPalette() {
+          this.palette = { ...DEFAULT_PALETTE };
+          this.renderPreview();
+        },
+
+        renderPreview() {
+          for (const scale of [1, 2, 4]) {
+            const canvas = document.getElementById('preview' + scale);
+            if (!canvas) continue;
+            canvas.width = this.gridW;
+            canvas.height = this.gridH;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, this.gridW, this.gridH);
+            for (let y = 0; y < this.grid.length; y++) {
+              for (let x = 0; x < (this.grid[y]?.length || 0); x++) {
+                const v = this.grid[y][x];
+                if (v === 0) continue;
+                ctx.fillStyle = this.palette[v] || '#ff00ff';
+                ctx.fillRect(x, y, 1, 1);
+              }
+            }
+          }
+        },
+
+        exportText() {
+          return this.grid.map(row => row.join('')).join('\n');
+        },
+
+        copyExport() {
+          navigator.clipboard.writeText(this.exportText());
+          this.copied = true;
+          setTimeout(() => this.copied = false, 1500);
+        },
+
+        copyExportWrapped() {
+          const inner = this.grid.map(row => '    ' + row.join('')).join('\n');
+          const text = 'p(`\n' + inner + '`)';
+          navigator.clipboard.writeText(text);
+          this.copied = true;
+          setTimeout(() => this.copied = false, 1500);
+        },
+
+        doImport() {
+          const raw = this.importText
+            .replace(/p\(\s*`/g, '')
+            .replace(/`\s*\)/g, '')
+            .trim();
+          const rows = raw.split('\n')
+            .map(r => r.trim())
+            .filter(r => r.length > 0)
+            .map(r => r.split('').map(Number));
+          if (!rows.length) return;
+          this.saveSnapshot();
+          this.gridH = rows.length;
+          this.gridW = Math.max(...rows.map(r => r.length));
+          this.grid = rows.map(r => {
+            while (r.length < this.gridW) r.push(0);
+            return r;
+          });
+        },
+
+        onTraceFile(event) {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.traceUrl = e.target.result;
+            this.traceVisible = true;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        onImageFile(event) {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.imagePreviewUrl = e.target.result;
+            const img = new Image();
+            img.onload = () => { this.imageEl = img; };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        hexToRgb(hex) {
+          const h = hex.replace('#', '');
+          return {
+            r: parseInt(h.substring(0, 2), 16),
+            g: parseInt(h.substring(2, 4), 16),
+            b: parseInt(h.substring(4, 6), 16),
+          };
+        },
+
+        applyImage() {
+          if (!this.imageEl) return;
+          this.saveSnapshot();
+
+          const canvas = document.getElementById('imgScratch');
+          canvas.width = this.gridW;
+          canvas.height = this.gridH;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, this.gridW, this.gridH);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(this.imageEl, 0, 0, this.gridW, this.gridH);
+          const data = ctx.getImageData(0, 0, this.gridW, this.gridH).data;
+
+          const newGrid = this.makeGrid(this.gridW, this.gridH);
+
+          if (this.imgMode === 'silhouette') {
+            for (let y = 0; y < this.gridH; y++) {
+              for (let x = 0; x < this.gridW; x++) {
+                const i = (y * this.gridW + x) * 4;
+                const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                newGrid[y][x] = (a > 128 && lum < this.imgThreshold) ? this.imgFillDigit : 0;
+              }
+            }
+          } else {
+            const palRgb = {};
+            for (let d = 1; d <= 4; d++) {
+              palRgb[d] = this.hexToRgb(this.palette[d]);
+            }
+            for (let y = 0; y < this.gridH; y++) {
+              for (let x = 0; x < this.gridW; x++) {
+                const i = (y * this.gridW + x) * 4;
+                const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+                if (a < 128) { newGrid[y][x] = 0; continue; }
+                let bestDist = Infinity, bestDigit = 1;
+                for (let d = 1; d <= 4; d++) {
+                  const p = palRgb[d];
+                  const dist = (r - p.r) ** 2 + (g - p.g) ** 2 + (b - p.b) ** 2;
+                  if (dist < bestDist) { bestDist = dist; bestDigit = d; }
+                }
+                newGrid[y][x] = bestDigit;
+              }
+            }
+          }
+
+          this.grid = newGrid;
+        },
+
+        onKey(e) {
+          if (e.key >= '0' && e.key <= '4') {
+            this.activePalette = parseInt(e.key);
+            return;
+          }
+          if (e.key === 'b' || e.key === 'B') { this.tool = 'paint'; return; }
+          if (e.key === 'g' || e.key === 'G') { this.tool = 'fill'; return; }
+          if (e.key === 'i' || e.key === 'I') { this.tool = 'eyedropper'; return; }
+          if ((e.key === 't' || e.key === 'T') && this.traceUrl) { this.traceVisible = !this.traceVisible; return; }
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') { e.preventDefault(); this.redo(); return; }
+          if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); this.undo(); return; }
+        },
+      };
+    }
+  </script>
+</body>
+</html>
