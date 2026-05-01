@@ -14,6 +14,7 @@ export interface NPCData {
   requiredFlags?: string[];
   blockedDialogueKey?: string;
   afterInteractDialogueKey?: string;
+  processDexEntry?: string;
   showReceivedPokemon?: {
     name: string;
     level: number;

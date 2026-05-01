@@ -587,7 +587,7 @@ objects[17][17] = T.CRATE;
         width: 2,
         height: 1,
         type: 'gate',
-        target: 'deloitte_lobby',
+        target: 'deloitte_terminal',
         requiredFlags: ['enc_bt_edi_done', 'enc_bt_mrp_done', 'bt_boss_talked'],
         dialogueKey: 'bt_gate_blocked',
       },
@@ -596,112 +596,261 @@ objects[17][17] = T.CRATE;
   };
 }
 
-function makeDeloitteTower(): MapData {
-  const w = 14;
-  const h = 32;
-  const ground = grid(w, h, T.CARPET);
+function makeDeloitteAirport(): MapData {
+  const w = 21;
+  const h = 23;
+  const ground = grid(w, h, T.FACTORY_FLOOR);
   const objects = grid(w, h, 0);
 
-  wallBox(objects, 0, 0, w, h);
+  // Border: AIRPORT_CRATE all around
+  for (let x = 0; x < w; x++) { objects[0]![x] = T.AIRPORT_CRATE; objects[h - 1]![x] = T.AIRPORT_CRATE; }
+  for (let y = 1; y < h - 1; y++) { objects[y]![0] = T.AIRPORT_CRATE; objects[y]![w - 1] = T.AIRPORT_CRATE; }
 
-  objects[h - 1]![6] = T.DOOR;
-  objects[h - 1]![7] = T.DOOR;
+  // Top and bottom carpet strips (gate agent rows)
+  stampRect(ground, 1, 1, w - 2, 1, T.CARPET);
+  stampRect(ground, 1, h - 2, w - 2, 1, T.CARPET);
 
-  objects[0]![6] = T.ELEVATOR;
-  objects[0]![7] = T.ELEVATOR;
+  // Right wall openings: entrance (row 4) and exit (row 14)
+  objects[4]![w - 1] = T.DOOR;
+  objects[15]![w - 1] = T.DOOR;
 
-  stampRect(ground, 5, 1, 4, h - 2, T.FLOOR_ALT);
+  // ─── Maze walls ────────────────────────────────────────────────────────
+  // Row 1: gate agents at 4, 13
+  objects[1]![17] = T.AIRPORT_CRATE;
+  // Row 2
+  objects[2]![17] = T.AIRPORT_CRATE;
+  objects[2]![6] = T.AIRPORT_CRATE;
+  // Row 3
+  objects[3]![2] = T.AIRPORT_CRATE; objects[3]![3] = T.AIRPORT_CRATE; objects[3]![4] = T.AIRPORT_CRATE;
+  objects[3]![6] = T.AIRPORT_CRATE; objects[3]![8] = T.AIRPORT_CRATE; objects[3]![10] = T.AIRPORT_CRATE;
+  objects[3]![12] = T.AIRPORT_CRATE; objects[3]![14] = T.AIRPORT_CRATE; objects[3]![17] = T.AIRPORT_CRATE;
+  // Row 4
+  objects[4]![14] = T.AIRPORT_CRATE; objects[4]![15] = T.AIRPORT_CRATE;
+  objects[4]![16] = T.AIRPORT_CRATE; objects[4]![17] = T.AIRPORT_CRATE;
+  // Row 5
+  objects[5]![1] = T.AIRPORT_CRATE; objects[5]![2] = T.AIRPORT_CRATE;
+  objects[5]![5] = T.AIRPORT_CRATE; objects[5]![6] = T.AIRPORT_CRATE; objects[5]![7] = T.AIRPORT_CRATE;
+  objects[5]![8] = T.AIRPORT_CRATE; objects[5]![9] = T.AIRPORT_CRATE; objects[5]![11] = T.AIRPORT_CRATE;
+  // Row 6
+  objects[6]![2] = T.AIRPORT_CRATE; objects[6]![11] = T.AIRPORT_CRATE;
+  // Row 7
+  objects[7]![2] = T.AIRPORT_CRATE; objects[7]![4] = T.AIRPORT_CRATE; objects[7]![5] = T.AIRPORT_CRATE;
+  objects[7]![7] = T.AIRPORT_CRATE; objects[7]![9] = T.AIRPORT_CRATE; objects[7]![11] = T.AIRPORT_CRATE;
+  objects[7]![15] = T.AIRPORT_CRATE; objects[7]![16] = T.AIRPORT_CRATE; objects[7]![17] = T.AIRPORT_CRATE;
 
+  // Row 8
+  objects[8]![5] = T.AIRPORT_CRATE; objects[8]![6] = T.AIRPORT_CRATE; objects[8]![7] = T.AIRPORT_CRATE;
+  objects[8]![9] = T.AIRPORT_CRATE; objects[8]![11] = T.AIRPORT_CRATE; objects[8]![15] = T.AIRPORT_CRATE;
+  // Row 9
+  objects[9]![1] = T.AIRPORT_CRATE; objects[9]![2] = T.AIRPORT_CRATE; objects[9]![3] = T.AIRPORT_CRATE;
+  objects[9]![12] = T.AIRPORT_CRATE; objects[9]![13] = T.AIRPORT_CRATE; objects[9]![14] = T.AIRPORT_CRATE;
+  objects[9]![15] = T.AIRPORT_CRATE; objects[9]![17] = T.AIRPORT_CRATE; objects[9]![18] = T.AIRPORT_CRATE;
+  objects[9]![19] = T.AIRPORT_CRATE;
+  // Row 10
+  objects[10]![12] = T.AIRPORT_CRATE; objects[10]![13] = T.AIRPORT_CRATE;
+  objects[10]![17] = T.AIRPORT_CRATE; objects[10]![18] = T.AIRPORT_CRATE; objects[10]![19] = T.AIRPORT_CRATE;
+  // Row 11
+  objects[11]![2] = T.AIRPORT_CRATE; objects[11]![3] = T.AIRPORT_CRATE;
+  objects[11]![5] = T.AIRPORT_CRATE; objects[11]![6] = T.AIRPORT_CRATE; objects[11]![7] = T.AIRPORT_CRATE;
+  objects[11]![17] = T.AIRPORT_CRATE; objects[11]![18] = T.AIRPORT_CRATE; objects[11]![19] = T.AIRPORT_CRATE;
+  // Row 12
+  objects[12]![5] = T.AIRPORT_CRATE; objects[12]![6] = T.AIRPORT_CRATE; objects[12]![7] = T.AIRPORT_CRATE;
+  objects[12]![8] = T.AIRPORT_CRATE; objects[12]![9] = T.AIRPORT_CRATE;
+  objects[12]![17] = T.AIRPORT_CRATE; objects[12]![18] = T.AIRPORT_CRATE; objects[12]![19] = T.AIRPORT_CRATE;
+  // Row 13
+  objects[13]![2] = T.AIRPORT_CRATE; objects[13]![3] = T.AIRPORT_CRATE; objects[13]![4] = T.AIRPORT_CRATE;
+  objects[13]![7] = T.AIRPORT_CRATE;
+  objects[13]![17] = T.AIRPORT_CRATE; objects[13]![18] = T.AIRPORT_CRATE; objects[13]![19] = T.AIRPORT_CRATE;
+  // Row 14
+  objects[14]![14] = T.AIRPORT_CRATE; objects[14]![15] = T.AIRPORT_CRATE;
+  objects[14]![17] = T.AIRPORT_CRATE; objects[14]![18] = T.AIRPORT_CRATE; objects[14]![19] = T.AIRPORT_CRATE;
 
-  //objects[26]![2] = T.DESK; objects[26]![3] = T.COMPUTER;
+  // Row 15
+  objects[15]![2] = T.AIRPORT_CRATE; objects[15]![3] = T.AIRPORT_CRATE;
+  objects[15]![5] = T.AIRPORT_CRATE; objects[15]![7] = T.AIRPORT_CRATE;
+  objects[15]![9] = T.AIRPORT_CRATE; objects[15]![15] = T.AIRPORT_CRATE;
+  // Row 16
+  objects[16]![2] = T.AIRPORT_CRATE; objects[16]![7] = T.AIRPORT_CRATE;
+  objects[16]![9] = T.AIRPORT_CRATE; objects[16]![10] = T.AIRPORT_CRATE; objects[16]![11] = T.AIRPORT_CRATE;
+  objects[16]![12] = T.AIRPORT_CRATE; objects[16]![13] = T.AIRPORT_CRATE;
+  // Row 17
+  objects[17]![3] = T.AIRPORT_CRATE; objects[17]![5] = T.AIRPORT_CRATE; objects[17]![7] = T.AIRPORT_CRATE;
+  objects[17]![15] = T.AIRPORT_CRATE;
+  objects[17]![17] = T.AIRPORT_CRATE; objects[17]![18] = T.AIRPORT_CRATE; objects[17]![19] = T.AIRPORT_CRATE;
+  // Row 18
+  objects[18]![3] = T.AIRPORT_CRATE; objects[18]![5] = T.AIRPORT_CRATE; objects[18]![7] = T.AIRPORT_CRATE;
+  objects[18]![15] = T.AIRPORT_CRATE;
+  objects[18]![17] = T.AIRPORT_CRATE; objects[18]![18] = T.AIRPORT_CRATE; objects[18]![19] = T.AIRPORT_CRATE;
+  // Row 19
+  objects[19]![3] = T.AIRPORT_CRATE; objects[19]![5] = T.AIRPORT_CRATE; objects[19]![7] = T.AIRPORT_CRATE;
+  objects[19]![11] = T.AIRPORT_CRATE; objects[19]![12] = T.AIRPORT_CRATE; objects[19]![13] = T.AIRPORT_CRATE;
+  objects[19]![14] = T.AIRPORT_CRATE; objects[19]![15] = T.AIRPORT_CRATE;
+  objects[19]![17] = T.AIRPORT_CRATE; objects[19]![18] = T.AIRPORT_CRATE; objects[19]![19] = T.AIRPORT_CRATE;
+  // Row 20
+  objects[20]![7] = T.AIRPORT_CRATE; objects[20]![8] = T.AIRPORT_CRATE; objects[20]![9] = T.AIRPORT_CRATE;
+  objects[20]![17] = T.AIRPORT_CRATE; objects[20]![18] = T.AIRPORT_CRATE; objects[20]![19] = T.AIRPORT_CRATE;
+  // Row 21: carpet strip (gate agents at 4, 12) — border handles cols 0 & 20
+  objects[21]![4] = T.AIRPORT_CRATE; objects[21]![5] = T.AIRPORT_CRATE; objects[21]![6] = T.AIRPORT_CRATE;
+  objects[21]![7] = T.AIRPORT_CRATE; objects[21]![8] = T.AIRPORT_CRATE; objects[21]![9] = T.AIRPORT_CRATE;
+  objects[21]![10] = T.AIRPORT_CRATE; objects[21]![11] = T.AIRPORT_CRATE;
 
-  // Floor dividers (3 floors)
-  for (const divY of [23, 15, 7]) {
-    for (let x = 1; x <= 12; x++) objects[divY]![x] = T.WALL;
-  }
+  objects[21]![13] = T.AIRPORT_CRATE; objects[21]![14] = T.AIRPORT_CRATE; objects[21]![15] = T.AIRPORT_CRATE;
+  objects[21]![16] = T.AIRPORT_CRATE; objects[21]![17] = T.AIRPORT_CRATE; objects[21]![18] = T.AIRPORT_CRATE;
+  objects[21]![19] = T.AIRPORT_CRATE;
 
-  // Chokepoints at each trainer level
-  objects[27]![5] = T.DESK; objects[27]![8] = T.DESK;
-  objects[19]![5] = T.DESK; objects[19]![8] = T.DESK;
-  objects[11]![5] = T.DESK; objects[11]![8] = T.DESK;
+  // ─── Directional walkway tiles (ground layer) ──────────────────────────
+  // Stop pads
+  ground[4]![2] = T.WALKWAY_STOP;
+  ground[6]![7] = T.WALKWAY_STOP;
+  ground[7]![13] = T.WALKWAY_STOP;
+  ground[10]![13] = T.WALKWAY_STOP;
+  ground[13]![14] = T.WALKWAY_STOP;
+  ground[8]![15] = T.WALKWAY_STOP;
+  ground[11]![8] = T.WALKWAY_STOP;
+  ground[2]![14] = T.WALKWAY_STOP;
+  ground[6]![15] = T.WALKWAY_STOP;
+  ground[19]![9] = T.WALKWAY_STOP;
+  ground[20]![14] = T.WALKWAY_STOP;
+
+  // Left-pushing pads (<<)
+  ground[4]![4] = T.WALKWAY_L;
+  ground[4]![8] = T.WALKWAY_L;
+  ground[4]![10] = T.WALKWAY_L;
+  ground[4]![12] = T.WALKWAY_L;
+  ground[5]![17] = T.WALKWAY_L;
+  ground[6]![17] = T.WALKWAY_L;
+  ground[13]![13] = T.WALKWAY_L;
+  ground[14]![13] = T.WALKWAY_L;
+  ground[14]![4] = T.WALKWAY_L;
+  ground[14]![8] = T.WALKWAY_L;
+  ground[17]![13] = T.WALKWAY_L;
+  ground[18]![13] = T.WALKWAY_L;
+
+  // Down-pushing pads (vv)
+  ground[5]![13] = T.WALKWAY_D;
+  ground[9]![9] = T.WALKWAY_D;
+  ground[11]![15] = T.WALKWAY_D;
+  ground[17]![9] = T.WALKWAY_D;
+  ground[9]![11] = T.WALKWAY_D;
+  ground[13]![11] = T.WALKWAY_D;
+
+  // Right-pushing pads (>>)
+  ground[6]![4] = T.WALKWAY_R;
+  ground[7]![13] = T.WALKWAY_R;
+  ground[9]![5] = T.WALKWAY_R;
+  ground[10]![4] = T.WALKWAY_R;
+  ground[12]![10] = T.WALKWAY_R;
+  ground[12]![12] = T.WALKWAY_R;
+  ground[20]![10] = T.WALKWAY_R;
+  ground[11]![11] = T.WALKWAY_R;
+  ground[11]![13] = T.WALKWAY_R;
+
+  // Up-pushing pads (^^)
+  ground[5]![10] = T.WALKWAY_U;
+  ground[6]![12] = T.WALKWAY_U;
+  ground[7]![8] = T.WALKWAY_U;
+  ground[8]![12] = T.WALKWAY_U;
+  ground[10]![8] = T.WALKWAY_U;
+  ground[10]![10] = T.WALKWAY_U;
+  ground[9]![16] = T.WALKWAY_U;
+  ground[11]![4] = T.WALKWAY_U;
+  ground[11]![16] = T.WALKWAY_U;
+  ground[14]![10] = T.WALKWAY_U;
+  ground[12]![14] = T.WALKWAY_U;
+  ground[13]![16] = T.WALKWAY_U;
+  ground[17]![4] = T.WALKWAY_U;
+  ground[17]![6] = T.WALKWAY_U;
+  ground[19]![6] = T.WALKWAY_U;
+  ground[18]![8] = T.WALKWAY_U;
 
   return {
-    id: 'deloitte_lobby',
+    id: 'deloitte_terminal',
     chapterId: 'deloitte_tower',
-    name: 'Deloitte Tower',
+    name: 'O\'Hare Terminal — Deloitte Status Run',
     width: w,
     height: h,
     layers: { ground, objects },
-    playerSpawn: { x: 6, y: 30, facing: 'up' },
+    playerSpawn: { x: 19, y: 4, facing: 'left' },
     npcs: [
       {
-        id: 'npc_dt_lobby',
-        x: 8,
-        y: 29,
-        sprite: 'npc_manager',
-        facing: 'left',
-        dialogueKey: 'dt_lobby',
-        name: 'Senior Manager',
-      },
-      {
-        id: 'npc_dt_meta',
-        x: 7,
-        y: 27,
+        id: 'npc_gate_meta',
+        x: 4,
+        y: 1,
         sprite: 'npc_generic',
-        facing: 'left',
-        dialogueKey: 'dt_meta',
-        name: 'Meta Client',
-        interactedFlag: 'enc_dt_meta_done',
-        sightRange: 2,
-        encounterId: 'dt_meta',
-      },
-      {
-        id: 'npc_dt_cloudflare',
-        x: 6,
-        y: 19,
-        sprite: 'npc_generic',
-        facing: 'right',
-        dialogueKey: 'dt_cloudflare',
-        name: 'Cloudflare Client',
-        interactedFlag: 'enc_dt_cloudflare_done',
-        sightRange: 2,
-        encounterId: 'dt_cloudflare',
-      },
-      {
-        id: 'npc_dt_revenue',
-        x: 7,
-        y: 11,
-        sprite: 'npc_partner',
-        facing: 'left',
-        dialogueKey: 'dt_revenue',
-        name: 'CFO',
-        interactedFlag: 'enc_dt_revenue_done',
-        sightRange: 2,
-        encounterId: 'dt_revenue',
-      },
-      {
-        id: 'npc_dt_partner',
-        x: 7,
-        y: 3,
-        sprite: 'npc_partner',
         facing: 'down',
-        dialogueKey: 'dt_partner',
-        name: 'Partner',
+        dialogueKey: 'dt_gate_meta',
+        name: 'Gate A: Meta',
+        interactedFlag: 'enc_dt_meta_done',
+        processDexEntry: 'agile_delivery',
+      },
+      {
+        id: 'npc_gate_cloudflare',
+        x: 13,
+        y: 1,
+        sprite: 'npc_generic',
+        facing: 'down',
+        dialogueKey: 'dt_gate_cloudflare',
+        name: 'Gate B: Cloudflare',
+        interactedFlag: 'enc_dt_cloudflare_done',
+        processDexEntry: 'integration_platform',
+      },
+      {
+        id: 'npc_gate_warehousing',
+        x: 3,
+        y: 21,
+        sprite: 'npc_generic',
+        facing: 'up',
+        dialogueKey: 'dt_gate_warehousing',
+        name: 'Gate C: Warehousing',
+        interactedFlag: 'enc_dt_warehousing_done',
+        processDexEntry: 'cost_modeling',
+      },
+      {
+        id: 'npc_gate_revenue',
+        x: 12,
+        y: 21,
+        sprite: 'npc_generic',
+        facing: 'up',
+        dialogueKey: 'dt_gate_revenue',
+        name: 'Gate D: Revenue',
+        interactedFlag: 'enc_dt_revenue_done',
+        processDexEntry: 'revenue_recognition',
+      },
+      {
+        id: 'npc_dt_pilot',
+        x: 16,
+        y: 15,
+        sprite: 'npc_partner',
+        facing: 'left',
+        dialogueKey: 'dt_pilot',
+        name: 'Captain',
+        requiredFlags: ['enc_dt_meta_done', 'enc_dt_cloudflare_done', 'enc_dt_warehousing_done', 'enc_dt_revenue_done'],
+        blockedDialogueKey: 'dt_pilot_blocked',
         interactedFlag: 'dt_partner_talked',
       },
     ],
     triggers: [
       {
-        id: 'tr_dt_exit',
-        x: 6,
-        y: 0,
+        id: 'cs_dt_intro',
+        x: 18,
+        y: 4,
         width: 2,
+        height: 1,
+        type: 'cutscene',
+        dialogueKey: 'dt_airport_intro',
+        oneShot: true,
+      },
+      {
+        id: 'tr_dt_exit',
+        x: w - 1,
+        y: 15,
+        width: 1,
         height: 1,
         type: 'gate',
         target: 'reddit_campus',
         spawnX: 8,
         spawnY: 12,
-        requiredFlags: ['enc_dt_meta_done', 'enc_dt_cloudflare_done', 'enc_dt_revenue_done', 'dt_partner_talked'],
+        requiredFlags: ['enc_dt_meta_done', 'enc_dt_cloudflare_done', 'enc_dt_warehousing_done', 'enc_dt_revenue_done', 'dt_complete'],
         dialogueKey: 'dt_elevator_blocked',
       },
     ],
@@ -922,7 +1071,7 @@ export const maps: Record<string, MapData> = {
   uw_engineering: makeUwEngineering(),
   interview_trail: makeInterviewTrail(),
   baker_tilly_factory: makeBakerTillyFactory(),
-  deloitte_lobby: makeDeloitteTower(),
+  deloitte_terminal: makeDeloitteAirport(),
   reddit_campus: makeRedditCampus(),
   reddit_casino: makeRedditCasino(),
   hall_of_fame: makeHallOfFame(),

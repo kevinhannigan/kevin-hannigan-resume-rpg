@@ -62,6 +62,12 @@ const TILE_TEXTURE_KEYS: Record<number, string> = {
   [TILE.KARMA_BRIDGE_OFF]: 'tile_bridge_off',
   [TILE.MOD_STATUE]: 'tile_mod_statue',
   [TILE.ROULETTE_TABLE]: 'tile_roulette',
+  [TILE.WALKWAY_R]: 'tile_walkway_r',
+  [TILE.WALKWAY_L]: 'tile_walkway_l',
+  [TILE.WALKWAY_U]: 'tile_walkway_u',
+  [TILE.WALKWAY_D]: 'tile_walkway_d',
+  [TILE.WALKWAY_STOP]: 'tile_walkway_stop',
+  [TILE.AIRPORT_CRATE]: 'airport_crate',
 };
 
 const DIR_TEXTURE: Record<Direction, string> = {
@@ -146,6 +152,25 @@ export default class WorldScene extends Phaser.Scene {
   private rouletteChosenColor: 'RED' | 'BLACK' = 'RED';
   private sharePriceHud?: Phaser.GameObjects.Text;
 
+  // Walkway sliding state
+  private slidingDir: Direction | null = null;
+
+  // Airport terminal state
+  private airportTimeRemaining = 0;
+  private airportTimerEvent?: Phaser.Time.TimerEvent;
+  private airportTimerHud?: Phaser.GameObjects.Text;
+  private airportGateHud?: Phaser.GameObjects.Text;
+  private clearedGates = new Set<string>();
+
+  // Trivia overlay state
+  private triviaOpen = false;
+  private triviaContainer?: Phaser.GameObjects.Container;
+  private triviaMenuIndex = 0;
+  private triviaOptions: { label: string; correct: boolean }[] = [];
+  private triviaMenuTexts: Phaser.GameObjects.Text[] = [];
+  private triviaArrow?: Phaser.GameObjects.Image;
+  private currentTsaNpcId?: string;
+
   constructor() {
     super({ key: 'WorldScene' });
   }
@@ -180,6 +205,15 @@ export default class WorldScene extends Phaser.Scene {
     this.rouletteContainer = undefined;
     this.rouletteMenuTexts = [];
     this.rouletteArrow = undefined;
+    this.triviaOpen = false;
+    this.triviaContainer = undefined;
+    this.triviaMenuTexts = [];
+    this.triviaArrow = undefined;
+    this.airportTimerEvent?.remove();
+    this.airportTimerEvent = undefined;
+    this.airportTimerHud = undefined;
+    this.airportGateHud = undefined;
+    this.clearedGates.clear();
     (this.map as MapData | undefined) = undefined!;
     (this.player as Phaser.GameObjects.Sprite | undefined) = undefined!;
 
@@ -251,23 +285,12 @@ export default class WorldScene extends Phaser.Scene {
       return;
     }
 
-    // Deloitte tower: clone objects layer and open floor gates based on progress
-    if (this.mapId === 'deloitte_lobby') {
+    // Airport terminal: clone objects layer for dynamic modifications
+    if (this.mapId === 'deloitte_terminal') {
       map = {
         ...map,
         layers: { ground: map.layers.ground, objects: map.layers.objects.map(row => [...row]) },
       };
-      const obj = map.layers.objects;
-      const floorGates: [number, string][] = [
-        [23, 'enc_dt_meta_done'],
-        [15, 'enc_dt_cloudflare_done'],
-        [7, 'enc_dt_revenue_done'],
-      ];
-      for (const [y, flag] of floorGates) {
-        if (progressManager.getFlag(flag)) {
-          for (let x = 5; x <= 8; x++) obj[y]![x] = 0;
-        }
-      }
     }
 
     this.map = map;
@@ -372,10 +395,43 @@ export default class WorldScene extends Phaser.Scene {
       this.initCasino();
     }
 
+    // Airport terminal HUD
+    this.airportTimerHud = this.add
+      .text(GAME_WIDTH - 4, 4, '', {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
+        color: GB_HEX.LIGHTEST,
+        backgroundColor: GB_HEX.DARKEST,
+        padding: { x: 4, y: 3 },
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(200)
+      .setVisible(false);
+
+    this.airportGateHud = this.add
+      .text(GAME_WIDTH - 4, 18, '', {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
+        color: GB_HEX.LIGHTEST,
+        backgroundColor: GB_HEX.DARKEST,
+        padding: { x: 4, y: 3 },
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(200)
+      .setVisible(false);
+
+    if (this.mapId === 'deloitte_terminal') {
+      this.initAirport();
+    }
+
     this.events.once('shutdown', () => {
       this.dialogueManager?.destroy();
       this.pauseContainer?.destroy();
       this.rouletteContainer?.destroy();
+      this.triviaContainer?.destroy();
+      this.airportTimerEvent?.remove();
     });
   }
 
@@ -463,7 +519,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   private tryMove(dx: number, dy: number, dir: Direction) {
-    if (this.isMoving || this.isTransitioning || this.trainerActive || this.pauseOpen || this.rouletteOpen || this.dialogueManager.getIsOpen()) return;
+    if (this.isMoving || this.isTransitioning || this.trainerActive || this.pauseOpen || this.rouletteOpen || this.triviaOpen || this.dialogueManager.getIsOpen()) return;
 
     this.facing = dir;
     this.applyPlayerFrame();
@@ -495,6 +551,9 @@ export default class WorldScene extends Phaser.Scene {
         }
         if (!this.isTransitioning && !this.dialogueManager.getIsOpen() && !this.trainerActive) {
           this.checkWildGrass();
+        }
+        if (!this.isTransitioning && !this.dialogueManager.getIsOpen() && !this.trainerActive) {
+          this.checkWalkway();
         }
       },
     });
@@ -1198,7 +1257,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   private tryInteract() {
-    if (this.isMoving || this.pauseOpen || this.rouletteOpen || this.dialogueManager.getIsOpen()) return;
+    if (this.isMoving || this.pauseOpen || this.rouletteOpen || this.triviaOpen || this.dialogueManager.getIsOpen()) return;
     const off = DIR_OFFSET[this.facing];
     const fx = this.playerGridX + off.x;
     const fy = this.playerGridY + off.y;
@@ -1214,6 +1273,67 @@ export default class WorldScene extends Phaser.Scene {
       if (npc.id === 'npc_roulette_dealer') {
         this.openRouletteGame();
         return;
+      }
+
+      // TSA agents open trivia overlay (if not already cleared)
+      if (npc.id === 'npc_tsa_1' && !progressManager.getFlag('tsa_1_cleared')) {
+        this.openTrivia(npc.id);
+        return;
+      }
+      if (npc.id === 'npc_tsa_2' && !progressManager.getFlag('tsa_2_cleared')) {
+        this.openTrivia(npc.id);
+        return;
+      }
+
+      // Gate NPCs: award processDex + set flag on first interaction
+      if (npc.id.startsWith('npc_gate_') && npc.interactedFlag && !progressManager.getFlag(npc.interactedFlag)) {
+        const seq = dialogues[npc.dialogueKey];
+        if (seq) {
+          void this.dialogueManager.showSequence(seq.lines, () => {
+            if (npc.interactedFlag) progressManager.setFlag(npc.interactedFlag);
+            if (npc.processDexEntry) progressManager.addProcessDexEntry(npc.processDexEntry);
+            if (seq.setFlag) progressManager.setFlag(seq.setFlag);
+            this.clearedGates.add(npc.id);
+            this.updateAirportHud();
+          });
+        }
+        return;
+      }
+
+      // Pilot NPC: award badge, set flags, trigger evolution
+      if (npc.id === 'npc_dt_pilot' && progressManager.hasAllFlags(npc.requiredFlags ?? [])) {
+        if (!progressManager.getFlag('dt_complete')) {
+          const seq = dialogues[npc.dialogueKey];
+          if (seq) {
+            void this.dialogueManager.showSequence(seq.lines, () => {
+              progressManager.setFlag('dt_complete');
+              progressManager.setFlag('dt_partner_talked');
+              progressManager.addBadge('Consulting Badge');
+              if (seq.setFlag) progressManager.setFlag(seq.setFlag);
+              this.airportTimerEvent?.remove();
+              this.airportTimerHud?.setVisible(false);
+              this.airportGateHud?.setVisible(false);
+
+              // Check for Bucky evolution (consultant -> product_manager)
+              const currentForm = progressManager.getBuckyForm();
+              if (currentForm === 'consultant' && progressManager.hasAllFlags(['enc_dt_meta_done', 'enc_dt_cloudflare_done', 'enc_dt_revenue_done'])) {
+                progressManager.setBuckyForm('product_manager');
+                this.isTransitioning = true;
+                this.cameras.main.fadeOut(300, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', () => {
+                  this.scene.start('EvolutionScene', {
+                    fromForm: 'consultant',
+                    toForm: 'product_manager',
+                    returnMap: this.mapId,
+                    returnX: this.playerGridX,
+                    returnY: this.playerGridY,
+                  });
+                });
+              }
+            });
+          }
+          return;
+        }
       }
 
       if (npc.requiredFlags?.length && !progressManager.hasAllFlags(npc.requiredFlags)) {
@@ -1256,6 +1376,7 @@ export default class WorldScene extends Phaser.Scene {
         void this.dialogueManager.showSequence(seq.lines, () => {
           if (seq.setFlag) progressManager.setFlag(seq.setFlag);
           if (npc.interactedFlag) progressManager.setFlag(npc.interactedFlag);
+          if (npc.processDexEntry) progressManager.addProcessDexEntry(npc.processDexEntry);
           if (npc.showReceivedPokemon) {
             this.showReceivedPokemonOverlay(npc.showReceivedPokemon, () => {});
           }
@@ -1482,6 +1603,261 @@ export default class WorldScene extends Phaser.Scene {
     this.pauseMenuTexts = [];
   }
 
+  // ─── Airport Terminal Logic ─────────────────────────────────────────────
+
+  private initAirport() {
+    this.airportTimeRemaining = 180;
+
+    // Restore gate progress from flags
+    const gateFlags: [string, string][] = [
+      ['npc_gate_meta', 'enc_dt_meta_done'],
+      ['npc_gate_cloudflare', 'enc_dt_cloudflare_done'],
+      ['npc_gate_warehousing', 'enc_dt_warehousing_done'],
+      ['npc_gate_revenue', 'enc_dt_revenue_done'],
+    ];
+    for (const [npcId, flag] of gateFlags) {
+      if (progressManager.getFlag(flag)) this.clearedGates.add(npcId);
+    }
+
+    if (progressManager.getFlag('dt_complete')) {
+      this.airportTimerHud?.setVisible(false);
+      this.airportGateHud?.setVisible(false);
+      return;
+    }
+
+    this.airportTimerEvent = this.time.addEvent({
+      delay: 1000,
+      callback: this.tickAirportTimer,
+      callbackScope: this,
+      loop: true,
+    });
+
+    this.updateAirportHud();
+  }
+
+  private tickAirportTimer() {
+    if (progressManager.getFlag('dt_complete')) {
+      this.airportTimerEvent?.remove();
+      return;
+    }
+    this.airportTimeRemaining--;
+    this.updateAirportHud();
+
+    if (this.airportTimeRemaining <= 0) {
+      this.airportTimerEvent?.remove();
+      this.closeTrivia();
+      const seq = dialogues['dt_flight_missed'];
+      if (seq) {
+        void this.dialogueManager.showSequence(seq.lines, () => {
+          this.playerGridX = 19;
+          this.playerGridY = 4;
+          this.player.setPosition(19 * TILE_SIZE, 4 * TILE_SIZE);
+          this.airportTimeRemaining = 180;
+          this.airportTimerEvent = this.time.addEvent({
+            delay: 1000,
+            callback: this.tickAirportTimer,
+            callbackScope: this,
+            loop: true,
+          });
+          this.updateAirportHud();
+        });
+      }
+    }
+  }
+
+  private updateAirportHud() {
+    if (!this.airportTimerHud || !this.airportGateHud) return;
+    if (this.mapId !== 'deloitte_terminal' || progressManager.getFlag('dt_complete')) {
+      this.airportTimerHud.setVisible(false);
+      this.airportGateHud.setVisible(false);
+      return;
+    }
+    const m = Math.floor(this.airportTimeRemaining / 60);
+    const s = this.airportTimeRemaining % 60;
+    this.airportTimerHud.setText(`BOARD: ${m}:${s.toString().padStart(2, '0')}`);
+    this.airportTimerHud.setVisible(true);
+    this.airportGateHud.setText(`GATES: ${this.clearedGates.size}/4`);
+    this.airportGateHud.setVisible(true);
+  }
+
+  // ─── Walkway Logic ────────────────────────────────────────────────────
+
+  private static readonly WALKWAY_DIR: Record<number, Direction> = {
+    [TILE.WALKWAY_R]: Direction.RIGHT,
+    [TILE.WALKWAY_L]: Direction.LEFT,
+    [TILE.WALKWAY_U]: Direction.UP,
+    [TILE.WALKWAY_D]: Direction.DOWN,
+  };
+
+  private checkWalkway() {
+    const g = this.map.layers.ground[this.playerGridY]?.[this.playerGridX];
+    if (g === undefined) return;
+
+    // A WALKWAY_STOP tile kills all momentum
+    if (g === TILE.WALKWAY_STOP) {
+      this.slidingDir = null;
+      return;
+    }
+
+    // A directional tile sets (or overrides) the sliding direction
+    const d = WorldScene.WALKWAY_DIR[g];
+    if (d) {
+      this.slidingDir = d;
+    }
+
+    // If we have momentum, keep sliding
+    if (!this.slidingDir) return;
+
+    const off = DIR_OFFSET[this.slidingDir];
+    const tx = this.playerGridX + off.x;
+    const ty = this.playerGridY + off.y;
+
+    if (this.isWalkable(tx, ty)) {
+      const dir = this.slidingDir;
+      this.time.delayedCall(30, () => {
+        if (!this.isMoving && !this.dialogueManager.getIsOpen() && !this.triviaOpen && !this.pauseOpen) {
+          this.tryMove(off.x, off.y, dir);
+        }
+      });
+    } else {
+      // Hit a wall/obstacle — stop sliding
+      this.slidingDir = null;
+    }
+  }
+
+  // ─── Trivia Overlay ───────────────────────────────────────────────────
+
+  private readonly tsaTrivia: Record<string, { question: string; options: { label: string; correct: boolean }[] }> = {
+    npc_tsa_1: {
+      question: 'What does ASC 606 govern?',
+      options: [
+        { label: 'Revenue Recognition', correct: true },
+        { label: 'Inventory Management', correct: false },
+      ],
+    },
+    npc_tsa_2: {
+      question: 'What integration platform did\nKevin use at Cloudflare?',
+      options: [
+        { label: 'Dell Boomi', correct: true },
+        { label: 'MuleSoft', correct: false },
+      ],
+    },
+  };
+
+  private openTrivia(npcId: string) {
+    const trivia = this.tsaTrivia[npcId];
+    if (!trivia) return;
+    this.triviaOpen = true;
+    this.currentTsaNpcId = npcId;
+    this.triviaMenuIndex = 0;
+    this.triviaOptions = trivia.options;
+    this.buildTriviaPanel(trivia.question);
+  }
+
+  private closeTrivia() {
+    this.triviaOpen = false;
+    this.triviaContainer?.destroy();
+    this.triviaContainer = undefined;
+    this.triviaMenuTexts = [];
+    this.triviaArrow = undefined;
+    this.currentTsaNpcId = undefined;
+  }
+
+  private buildTriviaPanel(question: string) {
+    this.triviaContainer?.destroy();
+    this.triviaContainer = this.add.container(0, 0).setDepth(3500).setScrollFactor(0);
+
+    const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'menu_bg').setOrigin(0.5);
+    this.triviaContainer.add(bg);
+
+    const title = this.add.text(GAME_WIDTH / 2, 42, 'TSA SECURITY CHECK', {
+      fontFamily: TITLE_FONT, fontSize: '8px', color: GB_HEX.DARKEST,
+    }).setOrigin(0.5);
+    this.triviaContainer.add(title);
+
+    const qText = this.add.text(GAME_WIDTH / 2, 80, question, {
+      fontFamily: TITLE_FONT, fontSize: '7px', color: GB_HEX.DARK,
+      wordWrap: { width: 240 }, align: 'center',
+    }).setOrigin(0.5);
+    this.triviaContainer.add(qText);
+
+    this.triviaMenuTexts = [];
+    const startY = 130;
+    this.triviaOptions.forEach((opt, i) => {
+      const t = this.add.text(GAME_WIDTH / 2 - 40, startY + i * 24, opt.label, {
+        fontFamily: TITLE_FONT, fontSize: '7px', color: GB_HEX.DARKEST,
+      });
+      this.triviaContainer!.add(t);
+      this.triviaMenuTexts.push(t);
+    });
+
+    this.triviaArrow = this.add.image(GAME_WIDTH / 2 - 56, startY + 4, 'arrow_indicator')
+      .setOrigin(0.5).setDepth(3501);
+    this.triviaContainer.add(this.triviaArrow);
+    this.refreshTriviaHighlight();
+  }
+
+  private refreshTriviaHighlight() {
+    if (!this.triviaArrow || this.triviaMenuTexts.length === 0) return;
+    const startY = 130;
+    this.triviaArrow.setY(startY + this.triviaMenuIndex * 24 + 4);
+    this.triviaMenuTexts.forEach((t, i) => {
+      t.setColor(i === this.triviaMenuIndex ? GB_HEX.DARKEST : GB_HEX.DARK);
+    });
+  }
+
+  private triviaNavigate(delta: number) {
+    if (!this.triviaOpen) return;
+    const n = this.triviaOptions.length;
+    this.triviaMenuIndex = (this.triviaMenuIndex + delta + n) % n;
+    this.refreshTriviaHighlight();
+  }
+
+  private triviaConfirm() {
+    if (!this.triviaOpen || !this.currentTsaNpcId) return;
+    const opt = this.triviaOptions[this.triviaMenuIndex];
+    if (!opt) return;
+
+    if (opt.correct) {
+      this.closeTrivia();
+      const flagKey = this.currentTsaNpcId === 'npc_tsa_1' ? 'tsa_1_cleared' : 'tsa_2_cleared';
+      progressManager.setFlag(flagKey);
+
+      // Remove TSA NPC collision and sprite
+      this.npcGridPositions.delete(this.currentTsaNpcId!);
+      const sprite = this.npcSprites.get(this.currentTsaNpcId!);
+      sprite?.setVisible(false);
+
+      // Open the barrier tile
+      const npcId = this.currentTsaNpcId!;
+      if (npcId === 'npc_tsa_1') {
+        this.map.layers.objects[6]![9] = 0;
+      } else {
+        this.map.layers.objects[7]![26] = 0;
+      }
+
+      // Screen flash for correct answer
+      this.cameras.main.flash(300, 136, 192, 112);
+    } else {
+      const npcId = this.currentTsaNpcId;
+      this.closeTrivia();
+
+      this.airportTimeRemaining = Math.max(0, this.airportTimeRemaining - 30);
+      this.updateAirportHud();
+
+      this.isTransitioning = true;
+      this.cameras.main.fadeOut(220, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('EncounterScene', {
+          encounterId: 'dt_manual_audit',
+          returnMap: this.mapId,
+          returnX: this.playerGridX,
+          returnY: this.playerGridY,
+        });
+      });
+    }
+  }
+
   update() {
     if (!this.map || !this.player) return;
 
@@ -1519,6 +1895,17 @@ export default class WorldScene extends Phaser.Scene {
       return;
     }
 
+    if (this.triviaOpen) {
+      if (Phaser.Input.Keyboard.JustDown(this.cursors.up!) || Phaser.Input.Keyboard.JustDown(this.keyW)) {
+        this.triviaNavigate(-1);
+      } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down!) || Phaser.Input.Keyboard.JustDown(this.keyS)) {
+        this.triviaNavigate(1);
+      } else if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
+        this.triviaConfirm();
+      }
+      return;
+    }
+
     if (this.dialogueManager.getIsOpen()) {
       if (Phaser.Input.Keyboard.JustDown(this.keyEnter) || Phaser.Input.Keyboard.JustDown(this.keySpace)) {
         this.dialogueManager.advance();
@@ -1530,6 +1917,9 @@ export default class WorldScene extends Phaser.Scene {
       this.tryInteract();
       return;
     }
+
+    // Block manual movement while sliding on walkways
+    if (this.slidingDir) return;
 
     const dir = this.readDirectionInput();
     if (dir !== null) {
@@ -1549,7 +1939,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   private updateInteractHint() {
-    if (!this.interactHint || this.pauseOpen || this.rouletteOpen || this.dialogueManager.getIsOpen()) {
+    if (!this.interactHint || this.pauseOpen || this.rouletteOpen || this.triviaOpen || this.dialogueManager.getIsOpen()) {
       this.interactHint?.setVisible(false);
       return;
     }

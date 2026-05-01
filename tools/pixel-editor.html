@@ -73,17 +73,20 @@
     <div class="flex-1 space-y-5">
 
       <!-- Grid Size -->
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-4 flex-wrap">
         <label class="text-xs text-gray-400">Grid:</label>
-        <select x-model.number="gridW" @change="resizeGrid()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700">
-          <template x-for="s in [8,16,24,32]"><option :value="s" x-text="s"></option></template>
-        </select>
+        <input type="number" min="1" max="128" x-model.number="gridW" @change="resizeGrid()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700 w-16 text-center">
         <span class="text-gray-600">&times;</span>
-        <select x-model.number="gridH" @change="resizeGrid()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700">
-          <template x-for="s in [8,16,24,32]"><option :value="s" x-text="s"></option></template>
-        </select>
+        <input type="number" min="1" max="128" x-model.number="gridH" @change="resizeGrid()" class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700 w-16 text-center">
+        <div class="flex gap-1">
+          <template x-for="preset in [{l:'8x8',w:8,h:8},{l:'16x16',w:16,h:16},{l:'24x24',w:24,h:24},{l:'32x32',w:32,h:32},{l:'40x14',w:40,h:14}]" :key="preset.l">
+            <button @click="gridW = preset.w; gridH = preset.h; resizeGrid()"
+                    :class="gridW === preset.w && gridH === preset.h ? 'bg-emerald-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'"
+                    class="px-2 py-1 text-[10px] rounded" x-text="preset.l"></button>
+          </template>
+        </div>
         <label class="text-xs text-gray-400 ml-4">Zoom:</label>
-        <input type="range" min="16" max="40" x-model.number="cellSize" class="w-24 accent-emerald-500">
+        <input type="range" min="4" max="40" x-model.number="cellSize" class="w-24 accent-emerald-500">
         <span class="text-xs text-gray-500" x-text="cellSize + 'px'"></span>
       </div>
 
@@ -102,11 +105,16 @@
           <template x-for="(row, y) in grid" :key="y">
             <div class="flex">
               <template x-for="(cell, x) in row" :key="x">
-                <div class="grid-cell"
+                <div class="grid-cell relative"
                      :class="{ 'transparent-cell': cell === 0 && !(traceUrl && traceVisible) }"
                      :style="`width:${cellSize}px;height:${cellSize}px;${cell !== 0 ? 'background:' + getColor(cell) : ''}`"
                      @mousedown="paint(x, y)"
-                     @mouseenter="if(painting) paint(x, y)">
+                     @mouseenter="if(painting) paint(x, y); startHover(x, y)"
+                     @mouseleave="endHover()">
+                  <span x-show="hoverCoord && hoverCoord.x === x && hoverCoord.y === y"
+                        x-transition
+                        class="absolute z-50 -top-7 left-1/2 -translate-x-1/2 bg-black/90 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
+                        x-text="hoverCoord ? hoverCoord.x + ',' + hoverCoord.y : ''"></span>
                 </div>
               </template>
             </div>
@@ -320,12 +328,26 @@
         traceUrl: null,
         traceOpacity: 50,
         traceVisible: true,
+        hoverCoord: null,
+        hoverTimer: null,
 
         init() {
           this.grid = this.makeGrid(this.gridW, this.gridH);
           this.$nextTick(() => this.renderPreview());
           window.addEventListener('keydown', (e) => this.onKey(e));
           this.$watch('grid', () => this.renderPreview());
+        },
+
+        startHover(x, y) {
+          this.endHover();
+          this.hoverTimer = setTimeout(() => {
+            this.hoverCoord = { x, y };
+          }, 2000);
+        },
+
+        endHover() {
+          if (this.hoverTimer) { clearTimeout(this.hoverTimer); this.hoverTimer = null; }
+          this.hoverCoord = null;
         },
 
         makeGrid(w, h) {

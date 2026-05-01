@@ -263,69 +263,100 @@ export const dialogues: Record<string, DialogueSequence> = {
     ],
   },
 
-  // Deloitte Tower
-  dt_lobby: {
-    id: 'dt_lobby',
+  // Deloitte Airport Terminal
+  dt_airport_intro: {
+    id: 'dt_airport_intro',
     lines: [
-      { speaker: 'SENIOR MANAGER', text: 'Welcome to Deloitte Tower. Every floor is a different client engagement.' },
-      { speaker: 'SENIOR MANAGER', text: 'Meta, Cloudflare, Warehousing, Revenue — climb the tower and clear them all.' },
-      { speaker: 'SENIOR MANAGER', text: 'The Partner waits at the top. Good luck, consultant.' },
+      { speaker: 'SENIOR MANAGER', text: 'Welcome to O\'Hare, consultant. Your flight boards in 3 minutes.' },
+      { speaker: 'SENIOR MANAGER', text: 'You need to clear TSA and check in at all four gates before boarding.' },
+      { speaker: 'SENIOR MANAGER', text: 'Meta, Cloudflare, Warehousing, Revenue — the Captain won\'t wait.' },
+      { text: 'The boarding timer has started! Move fast.' },
     ],
     setFlag: 'dt_lobby_done',
   },
-  dt_meta: {
-    id: 'dt_meta',
+  dt_tsa_blocked: {
+    id: 'dt_tsa_blocked',
     lines: [
-      { speaker: 'META CLIENT', text: 'We need a forecasting application for data center costs. Millions in infrastructure spend.' },
-      { text: 'Kevin built a cost modeling and forecasting application.' },
-      { text: 'Data center costs: modeled. Forecasting accuracy improved by 40%.' },
+      { speaker: 'TSA AGENT', text: 'Hold it. Security check. Answer correctly or submit to a manual audit.' },
     ],
-    setFlag: 'dt_meta_done',
   },
-  dt_cloudflare: {
-    id: 'dt_cloudflare',
+  dt_gate_meta: {
+    id: 'dt_gate_meta',
     lines: [
-      { speaker: 'CLOUDFLARE CLIENT', text: 'We\'re going public. Our order management can\'t handle the scale.' },
-      { speaker: 'CLOUDFLARE CLIENT', text: 'Procurement, subscription billing, cash application — all disconnected.' },
-      { text: 'Kevin led pre-IPO procurement/order management scaling with Boomi integration.' },
-      { text: 'Subscription billing and cash application: connected and scalable.' },
+      { speaker: 'GATE AGENT', text: 'Gate A — Meta engagement. Data center cost modeling project.' },
+      { text: 'Kevin built a cost forecasting app with React and Python.' },
+      { text: 'Forecasting accuracy improved by 40%. Project logged!' },
     ],
-    setFlag: 'dt_cloudflare_done',
   },
-  dt_warehousing: {
-    id: 'dt_warehousing',
+  dt_gate_cloudflare: {
+    id: 'dt_gate_cloudflare',
     lines: [
-      { speaker: 'WAREHOUSE CLIENT', text: 'CRM, orders, inventory, returns — four systems that don\'t talk to each other.' },
-      { text: 'Kevin implemented CRM + Order Management + Inventory + Returns on NetSuite.' },
-      { text: 'End-to-end visibility: achieved. One source of truth.' },
+      { speaker: 'GATE AGENT', text: 'Gate B — Cloudflare engagement. Pre-IPO systems scaling.' },
+      { text: 'Kevin integrated procurement, billing, and cash application with Dell Boomi.' },
+      { text: 'IPO-ready operations: achieved. Project logged!' },
     ],
-    setFlag: 'dt_warehousing_done',
   },
-  dt_revenue: {
-    id: 'dt_revenue',
+  dt_gate_warehousing: {
+    id: 'dt_gate_warehousing',
     lines: [
-      { speaker: 'CFO', text: 'ASC 606 is killing us. Our revenue recognition is wrong and the auditors are circling.' },
-      { text: 'Kevin designed ASC 606 scenario models and implemented RPA for revenue recognition.' },
-      { text: 'Revenue compliance: automated. Audit-ready every quarter.' },
+      { speaker: 'GATE AGENT', text: 'Gate C — Warehousing engagement. CRM & Order Management.' },
+      { text: 'Kevin implemented CRM + OMS + Inventory + Returns on NetSuite for a $3B+ client.' },
+      { text: 'End-to-end visibility: achieved. Project logged!' },
     ],
-    setFlag: 'dt_revenue_done',
+  },
+  dt_gate_revenue: {
+    id: 'dt_gate_revenue',
+    lines: [
+      { speaker: 'GATE AGENT', text: 'Gate D — Revenue Recognition engagement. ASC 606 compliance.' },
+      { text: 'Kevin designed ASC 606 models and deployed RPA for automated journal entries.' },
+      { text: 'Audit-ready every quarter. Project logged!' },
+    ],
+  },
+  dt_pilot: {
+    id: 'dt_pilot',
+    lines: [
+      { speaker: 'CAPTAIN', text: 'All four gates cleared. Welcome aboard, consultant.' },
+      { speaker: 'CAPTAIN', text: 'Your work across Meta, Cloudflare, Warehousing, and Revenue has been outstanding.' },
+      { text: 'Kevin received the CONSULTING BADGE!' },
+      { text: 'Kevin earned 1K Flight Status and Marriott Platinum!' },
+      { text: 'He can now "Fly" to any previous level instantly.' },
+    ],
+    setFlag: 'dt_complete',
+  },
+  dt_pilot_blocked: {
+    id: 'dt_pilot_blocked',
+    lines: [
+      { speaker: 'CAPTAIN', text: 'You haven\'t checked in at all four gates yet. I can\'t let you board.' },
+    ],
   },
   dt_elevator_blocked: {
     id: 'dt_elevator_blocked',
     lines: [
-      { text: 'The elevator is locked. Complete all engagements and speak with the Partner.' },
+      { text: 'The jetway is closed. Complete all gates and speak with the Captain.' },
     ],
   },
-  dt_partner: {
-    id: 'dt_partner',
+  dt_flight_missed: {
+    id: 'dt_flight_missed',
     lines: [
-      { speaker: 'PARTNER', text: 'I\'ve seen your work across the floors. Your systems integration is... flawless.' },
-      { speaker: 'PARTNER', text: 'You\'re ready for the big leagues.' },
-      { text: 'Kevin received the CONSULTING BADGE!' },
-      { text: 'Kevin\'s status rose! He gained 1K Flight Status and Marriott Platinum!' },
-      { text: 'He can now "Fly" to any previous level instantly.' },
+      { text: 'FINAL BOARDING CALL... MISSED!' },
+      { text: 'The flight left without you. Back to the terminal entrance.' },
     ],
-    setFlag: 'dt_complete',
+  },
+  dt_sign_gate_a: {
+    id: 'dt_sign_gate_a',
+    lines: [{ text: 'GATE A — Meta: Data Center Cost Modeling' }],
+  },
+  dt_sign_gate_b: {
+    id: 'dt_sign_gate_b',
+    lines: [{ text: 'GATE B — Cloudflare: Pre-IPO Scaling' }],
+  },
+  dt_sign_gate_c: {
+    id: 'dt_sign_gate_c',
+    lines: [{ text: 'GATE C — Warehousing: CRM & Order Management' }],
+  },
+  dt_sign_gate_d: {
+    id: 'dt_sign_gate_d',
+    lines: [{ text: 'GATE D — Revenue: ASC 606 Compliance' }],
   },
 
   karma_reset: {

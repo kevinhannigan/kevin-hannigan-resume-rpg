@@ -31,11 +31,11 @@ export const chapters: Record<string, ChapterData> = {
   deloitte_tower: {
     id: 'deloitte_tower',
     title: 'Deloitte Digital',
-    subtitle: 'The Tower of Trials',
+    subtitle: 'The Status Run',
     year: '2017–2021',
-    summary: 'Product ownership, agile delivery, React/Python/PHP fluency, ERP/CRM implementation breadth, revenue recognition expertise, and pre-IPO operational scale work.',
+    summary: 'Race through the airport terminal to board your flight. Clear TSA checkpoints, log all four client projects at the gates, and earn your Consulting Badge before the boarding call.',
     badge: 'Consulting Badge',
-    maps: ['deloitte_lobby', 'deloitte_meta', 'deloitte_cloudflare', 'deloitte_warehousing', 'deloitte_revenue'],
+    maps: ['deloitte_terminal'],
   },
   reddit_hq: {
     id: 'reddit_hq',
